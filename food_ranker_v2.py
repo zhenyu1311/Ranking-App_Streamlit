@@ -262,7 +262,9 @@ ensure_state()
 st.title("🔢 TrueRanker — Pairwise Item Ranker")
 
 # Device selection
-device_type = st.radio("Are you on Desktop or Mobile?", ["Desktop", "Mobile"], horizontal=True)
+st.markdown("## 📱 **Are you on Desktop or Mobile?**")  # bigger heading
+device_type = st.radio("", ["Desktop", "Mobile"], horizontal=True)
+
 
 st.subheader("Upload Items")
 col1, col2, col3 = st.columns(3)
@@ -345,4 +347,5 @@ if st.session_state["final_rank"]:
         thumb = resize_for_display(load_image(p.path), scale=0.4)
         with cols[(i-1) % 5]:
             st.image(thumb, caption=f"#{i}: {p.name}")
+
 
