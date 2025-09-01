@@ -2,9 +2,9 @@
 # TrueRanker — Pairwise Item Ranker
 # Winner-stays ladder + transitivity skip.
 # Supports: upload single, multiple, or ZIP.
-# Device-aware: asks Desktop/Mobile; shrinks images on mobile so they fit side by side.
+# Device-aware: Desktop/Mobile option.
+# CSS override: force columns to stay side-by-side on mobile.
 # Shows progress: total items, ranked so far, remaining in current round.
-# Author : HEZHENYU GITHUB:zhenyu1311 1 SEP 2025
 
 import os
 import io
@@ -259,12 +259,31 @@ def record_choice(winner):
 st.set_page_config(page_title="TrueRanker", layout="wide")
 ensure_state()
 
+# CSS override for mobile: force columns side-by-side
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+  [data-testid="stHorizontalBlock"] {
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+  }
+  [data-testid="stHorizontalBlock"] > div {
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+  }
+  [data-testid="stHorizontalBlock"] img {
+    width: 100% !important;
+    height: auto !important;
+  }
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🔢 TrueRanker — Pairwise Item Ranker")
 
 # Device selection
-st.markdown("## 📱 **Are you on Desktop or Mobile?**")  # bigger heading
+st.markdown("## 📱 **Are you on Desktop or Mobile?**")
 device_type = st.radio("", ["Desktop", "Mobile"], horizontal=True)
-
 
 st.subheader("Upload Items")
 col1, col2, col3 = st.columns(3)
@@ -316,7 +335,7 @@ if st.session_state["items"]:
         if device_type == "Desktop":
             scale_val = 0.6
         else:  # Mobile
-            scale_val = 0.15  # shrink more so both fit side by side
+            scale_val = 0.33  # fits side by side
 
         imgA = resize_for_display(load_image(A.path), scale=scale_val)
         imgB = resize_for_display(load_image(B.path), scale=scale_val)
@@ -347,6 +366,3 @@ if st.session_state["final_rank"]:
         thumb = resize_for_display(load_image(p.path), scale=0.4)
         with cols[(i-1) % 5]:
             st.image(thumb, caption=f"#{i}: {p.name}")
-
-
-
