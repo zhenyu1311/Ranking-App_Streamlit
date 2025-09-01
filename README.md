@@ -1,3 +1,5 @@
+https://favranker.streamlit.app/
+
 Pairwise Item Ranker
 
 A lightweight web app to rank anything — food, outfits, songs, characters, designs, you name it — by making simple pairwise choices.
