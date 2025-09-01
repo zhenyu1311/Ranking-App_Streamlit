@@ -2,13 +2,13 @@
 # TrueRanker — Pairwise Item Ranker
 # Winner-stays ladder + transitivity skip.
 # Supports: upload single, multiple, or ZIP.
-# Mobile-friendly: images side-by-side in a horizontal scroll, with buttons below each.
+# Device-aware: asks Desktop/Mobile; shrinks images on mobile so they fit side by side.
+# Shows progress: total items, ranked so far, remaining in current round.
 # Author : HEZHENYU GITHUB:zhenyu1311 1 SEP 2025
 
 import os
 import io
 import sys
-import json
 import random
 import zipfile
 import tempfile
@@ -17,7 +17,6 @@ import subprocess
 from functools import lru_cache
 from dataclasses import dataclass
 from typing import Dict, Optional
-import base64
 
 # --------------------------
 # Dependency bootstrap
@@ -255,45 +254,15 @@ def record_choice(winner):
     advance_until_choice()
 
 # --------------------------
-# Horizontal scroll display with buttons
-# --------------------------
-def show_side_by_side_with_buttons(imgs, labels, ids, height=400):
-    st.markdown(
-        f"""
-        <style>
-        .scroll-container {{
-            display: flex;
-            overflow-x: auto;
-            gap: 40px;
-        }}
-        .scroll-item {{
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }}
-        .scroll-item img {{
-            max-height: {height}px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    cols = st.columns(len(imgs))
-    for i, (img, label, pid) in enumerate(zip(imgs, labels, ids)):
-        with cols[i]:
-            st.image(img, caption=label)
-            if st.button(f"✅ {label}", key=f"btn_{pid}"):
-                record_choice(pid)
-                st.rerun()
-
-# --------------------------
 # UI
 # --------------------------
 st.set_page_config(page_title="TrueRanker", layout="wide")
 ensure_state()
 
 st.title("🔢 TrueRanker — Pairwise Item Ranker")
+
+# Device selection
+device_type = st.radio("Are you on Desktop or Mobile?", ["Desktop", "Mobile"], horizontal=True)
 
 st.subheader("Upload Items")
 col1, col2, col3 = st.columns(3)
@@ -324,22 +293,50 @@ if len(st.session_state["staged"]) >= 2 and not st.session_state["items"]:
         advance_until_choice()
         st.rerun()
 
-if st.session_state["items"] and st.session_state["current_pair"]:
-    a, b = st.session_state["current_pair"]
-    A, B = st.session_state["id_to_item"][a], st.session_state["id_to_item"][b]
-    imgA = resize_for_display(load_image(A.path), scale=0.6)
-    imgB = resize_for_display(load_image(B.path), scale=0.6)
-
-    st.subheader("Choose the winner")
-    show_side_by_side_with_buttons(
-        [imgA, imgB],
-        [f"LEFT: {A.name}", f"RIGHT: {B.name}"],
-        [A.id, B.id],
-        height=400
+# --------------------------
+# Progress + Ranking UI
+# --------------------------
+if st.session_state["items"]:
+    total = len(st.session_state["items"])
+    ranked = len(st.session_state["final_rank"])
+    remain_round = (1 + len(st.session_state["pool"])) if st.session_state["contender"] else 0
+    st.markdown(
+        f"**Total items:** {total} &nbsp; • &nbsp; "
+        f"**Ranked so far:** {ranked} &nbsp; • &nbsp; "
+        f"**Remaining this round:** {remain_round}"
     )
-elif st.session_state["items"] and len(st.session_state["final_rank"]) == len(st.session_state["items"]):
-    st.success("🏁 All items ranked!")
 
+    if st.session_state["current_pair"]:
+        a, b = st.session_state["current_pair"]
+        A, B = st.session_state["id_to_item"][a], st.session_state["id_to_item"][b]
+
+        # Adjust scale for desktop vs mobile
+        if device_type == "Desktop":
+            scale_val = 0.6
+        else:  # Mobile
+            scale_val = 0.3  # shrink more so both fit side by side
+
+        imgA = resize_for_display(load_image(A.path), scale=scale_val)
+        imgB = resize_for_display(load_image(B.path), scale=scale_val)
+
+        st.subheader("Choose the winner")
+        colA, colB = st.columns(2)
+        with colA:
+            st.image(imgA, caption=f"LEFT: {A.name}")
+            if st.button("✅ Choose LEFT"):
+                record_choice(A.id)
+                st.rerun()
+        with colB:
+            st.image(imgB, caption=f"RIGHT: {B.name}")
+            if st.button("✅ Choose RIGHT"):
+                record_choice(B.id)
+                st.rerun()
+    elif len(st.session_state["final_rank"]) == total:
+        st.success("🏁 All items ranked!")
+
+# --------------------------
+# Current Ranking Preview
+# --------------------------
 if st.session_state["final_rank"]:
     st.subheader("Current Ranking")
     cols = st.columns(5)
