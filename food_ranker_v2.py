@@ -366,3 +366,4 @@ if st.session_state["final_rank"]:
         thumb = resize_for_display(load_image(p.path), scale=0.4)
         with cols[(i-1) % 5]:
             st.image(thumb, caption=f"#{i}: {p.name}")
+
