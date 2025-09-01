@@ -1,6 +1,7 @@
 # food_ranker_v2.py
 # Local-folder ranking app (winner-stays ladder) with transitivity and exports.
 # Optimized version (cached thumbnails, cached order) but progress strips are COMMENTED OUT.
+#AUTHOR: HE ZHENYU. GITHUB:zhenyu1311 on 1 SEP 2025
 
 import os
 import io
@@ -389,3 +390,4 @@ with c_zip:
                     except Exception:
                         continue
             st.download_button("Save Ranked ZIP", data=zip_buf.getvalue(), file_name="ranked_images.zip", mime="application/zip")
+
