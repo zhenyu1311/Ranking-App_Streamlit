@@ -314,7 +314,7 @@ if st.session_state["items"]:
         if device_type == "Desktop":
             scale_val = 0.6
         else:  # Mobile
-            scale_val = 0.3  # shrink more so both fit side by side
+            scale_val = 0.2  # shrink more so both fit side by side
 
         imgA = resize_for_display(load_image(A.path), scale=scale_val)
         imgB = resize_for_display(load_image(B.path), scale=scale_val)
@@ -345,3 +345,4 @@ if st.session_state["final_rank"]:
         thumb = resize_for_display(load_image(p.path), scale=0.4)
         with cols[(i-1) % 5]:
             st.image(thumb, caption=f"#{i}: {p.name}")
+
