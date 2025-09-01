@@ -1,19 +1,14 @@
 # trueranker.py
 # TrueRanker — Pairwise Item Ranker
 # Winner-stays ladder + transitivity skip.
-# NOW supports:
-#   - Staging uploads: add single images one-by-one (mobile-friendly) and/or bulk images/ZIP
-#   - "Start ranking" button to begin once you're ready
-# Keeps: Local folder loader (desktop), pair-memory JSON, CSV/ZIP exports.
-# Progress strips are not shown.
+# Supports: upload single, multiple, or ZIP.
+# Mobile-friendly: images side-by-side in a horizontal scroll, with buttons below each.
 # Author : HEZHENYU GITHUB:zhenyu1311 1 SEP 2025
-# Shows choices in a horizontal scroll row (mobile-friendly).
 
 import os
 import io
 import sys
 import json
-import glob
 import random
 import zipfile
 import tempfile
@@ -21,13 +16,13 @@ import importlib
 import subprocess
 from functools import lru_cache
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import base64
 
 # --------------------------
 # Dependency bootstrap
 # --------------------------
-def ensure_deps(packages: List[str]):
+def ensure_deps(packages):
     for pkg in packages:
         try:
             importlib.import_module(pkg)
@@ -59,10 +54,10 @@ class PhotoItem:
     name: str
     path: str
 
-def pair_key(a: str, b: str) -> str:
+def pair_key(a, b):
     return f"{a}|{b}" if a < b else f"{b}|{a}"
 
-def load_image(path: str, max_dim: int = 2000) -> Image.Image:
+def load_image(path, max_dim=2000):
     img = Image.open(path).convert("RGB")
     w, h = img.size
     if max(w, h) > max_dim:
@@ -74,7 +69,7 @@ def load_image(path: str, max_dim: int = 2000) -> Image.Image:
             img = img.resize((nw, max_dim))
     return img
 
-def resize_for_display(img: Image.Image, *, scale: float = 0.6, max_width: int = 1000) -> Image.Image:
+def resize_for_display(img, *, scale=0.6, max_width=1000):
     w, h = img.size
     nw = max(1, int(w * scale))
     nh = max(1, int(h * scale))
@@ -90,7 +85,7 @@ def ensure_workdir():
     if "work_dir" not in st.session_state or not os.path.isdir(st.session_state["work_dir"]):
         st.session_state["work_dir"] = tempfile.mkdtemp(prefix="trueranker_")
 
-def save_bytes(filename: str, data: bytes) -> str:
+def save_bytes(filename, data):
     ensure_workdir()
     safe = filename.replace("\\", "_").replace("/", "_")
     path = os.path.join(st.session_state["work_dir"], safe)
@@ -118,14 +113,14 @@ def ingest_single(upload) -> Optional[PhotoItem]:
     st.session_state["staged"][fname] = item
     return item
 
-def ingest_multiple(files) -> int:
+def ingest_multiple(files):
     count = 0
     for f in files or []:
         if ingest_single(f):
             count += 1
     return count
 
-def ingest_zip(upload) -> int:
+def ingest_zip(upload):
     if not upload:
         return 0
     count = 0
@@ -154,8 +149,8 @@ def ingest_zip(upload) -> int:
 # --------------------------
 # Transitivity
 # --------------------------
-def build_win_graph(pair_wins: Dict[str, str]) -> Dict[str, set]:
-    g: Dict[str, set] = {}
+def build_win_graph(pair_wins):
+    g = {}
     for k, winner in pair_wins.items():
         a, b = k.split("|", 1)
         loser = b if winner == a else a
@@ -163,9 +158,9 @@ def build_win_graph(pair_wins: Dict[str, str]) -> Dict[str, set]:
         g.setdefault(loser, set())
     return g
 
-def dominates_factory(graph: Dict[str, set]):
+def dominates_factory(graph):
     @lru_cache(maxsize=None)
-    def dominates(a: str, b: str) -> bool:
+    def dominates(a, b):
         if a == b: return False
         stack, seen = [a], set()
         while stack:
@@ -245,7 +240,7 @@ def advance_until_choice():
         ss["current_pair"] = (ss["contender"], challenger)
         return
 
-def record_choice(winner: str):
+def record_choice(winner):
     ss = st.session_state
     if not ss["current_pair"]: return
     c, d = ss["current_pair"]
@@ -260,32 +255,37 @@ def record_choice(winner: str):
     advance_until_choice()
 
 # --------------------------
-# Horizontal scroll display
+# Horizontal scroll display with buttons
 # --------------------------
-def show_side_by_side(imgs, captions, height=300):
+def show_side_by_side_with_buttons(imgs, labels, ids, height=400):
     st.markdown(
         f"""
         <style>
         .scroll-container {{
             display: flex;
             overflow-x: auto;
+            gap: 40px;
         }}
-        .scroll-container img {{
+        .scroll-item {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }}
+        .scroll-item img {{
             max-height: {height}px;
-            margin-right: 12px;
         }}
         </style>
         """,
         unsafe_allow_html=True
     )
-    html = '<div class="scroll-container">'
-    for img, cap in zip(imgs, captions):
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
-        html += f'<div><img src="data:image/png;base64,{b64}"><br><small>{cap}</small></div>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+
+    cols = st.columns(len(imgs))
+    for i, (img, label, pid) in enumerate(zip(imgs, labels, ids)):
+        with cols[i]:
+            st.image(img, caption=label)
+            if st.button(f"✅ {label}", key=f"btn_{pid}"):
+                record_choice(pid)
+                st.rerun()
 
 # --------------------------
 # UI
@@ -298,11 +298,11 @@ st.title("🔢 TrueRanker — Pairwise Item Ranker")
 st.subheader("Upload Items")
 col1, col2, col3 = st.columns(3)
 with col1:
-    single = st.file_uploader("Upload single image", type=[e.lstrip(".") for e in ALLOWED_EXTS], key="single")
+    single = st.file_uploader("Upload single image", type=[e.lstrip('.') for e in ALLOWED_EXTS], key="single")
     if st.button("➕ Add single"):
         if ingest_single(single): st.success("Upload successful.")
 with col2:
-    multi = st.file_uploader("Upload image file(s)", type=[e.lstrip(".") for e in ALLOWED_EXTS], accept_multiple_files=True, key="multi")
+    multi = st.file_uploader("Upload image file(s)", type=[e.lstrip('.') for e in ALLOWED_EXTS], accept_multiple_files=True, key="multi")
     if st.button("➕ Add files"):
         if ingest_multiple(multi): st.success("Upload successful.")
 with col3:
@@ -310,7 +310,6 @@ with col3:
     if st.button("➕ Add ZIP"):
         if ingest_zip(zipf): st.success("Upload successful.")
 
-# Start ranking prompt
 if len(st.session_state["staged"]) >= 2 and not st.session_state["items"]:
     st.markdown("✅ Upload successful. Do you want to **start ranking**?")
     if st.button("Start ranking"):
@@ -325,7 +324,6 @@ if len(st.session_state["staged"]) >= 2 and not st.session_state["items"]:
         advance_until_choice()
         st.rerun()
 
-# Ranking UI
 if st.session_state["items"] and st.session_state["current_pair"]:
     a, b = st.session_state["current_pair"]
     A, B = st.session_state["id_to_item"][a], st.session_state["id_to_item"][b]
@@ -333,21 +331,15 @@ if st.session_state["items"] and st.session_state["current_pair"]:
     imgB = resize_for_display(load_image(B.path), scale=0.6)
 
     st.subheader("Choose the winner")
-    show_side_by_side([imgA, imgB], [f"LEFT: {A.name}", f"RIGHT: {B.name}"])
-
-    colA, colB = st.columns(2)
-    with colA:
-        if st.button("✅ Choose LEFT"):
-            record_choice(A.id)
-            st.rerun()
-    with colB:
-        if st.button("✅ Choose RIGHT"):
-            record_choice(B.id)
-            st.rerun()
+    show_side_by_side_with_buttons(
+        [imgA, imgB],
+        [f"LEFT: {A.name}", f"RIGHT: {B.name}"],
+        [A.id, B.id],
+        height=400
+    )
 elif st.session_state["items"] and len(st.session_state["final_rank"]) == len(st.session_state["items"]):
     st.success("🏁 All items ranked!")
 
-# Ranking preview
 if st.session_state["final_rank"]:
     st.subheader("Current Ranking")
     cols = st.columns(5)
@@ -356,4 +348,3 @@ if st.session_state["final_rank"]:
         thumb = resize_for_display(load_image(p.path), scale=0.4)
         with cols[(i-1) % 5]:
             st.image(thumb, caption=f"#{i}: {p.name}")
-
